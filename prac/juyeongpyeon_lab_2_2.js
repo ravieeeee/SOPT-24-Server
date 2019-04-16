@@ -17,7 +17,12 @@ const server = http.createServer((req, res) => {
     }])
     fs.writeFile('./data.csv', csv, (err) => {
       if (err) return
-      res.end()
+
+      fs.readFile('./data.csv', (err, data) => {
+        if (err) return
+        
+        res.end(data.toString())
+      })
     })
   })
 })
