@@ -5,6 +5,7 @@ const crypto = require('crypto')
 const { Parser } = require('json2csv')
 const fs = require('fs')
 const csvtojson = require('csvtojson')
+const request = require('request')
 
 const server = http.createServer((req, res) => {
   switch (url.parse(req.url).pathname) {
@@ -32,7 +33,7 @@ const server = http.createServer((req, res) => {
           const hashedPW = derivedKey.toString('base64')
           console.log('hashedPW:', hashedPW)
 
-          const json2csvParser = new Parser({ fileds: [ 'id', 'hashedPW', 'salt' ] })
+          const json2csvParser = new Parser({ fileds: [ 'id', 'hashedPW', 'salt' ]})
           const csvData = json2csvParser.parse([{
             id: query.id,
             pw: hashedPW,
@@ -80,6 +81,34 @@ const server = http.createServer((req, res) => {
       break
     }
     case '/info': {
+      const uri = 'http://15.164.75.18:3000/homework/2nd'
+      request.post(uri, { form: { name: '편주영', phone: '010-9413-7094' }}, (err, response, body) => {
+        if (err) return
+        
+        const responseBody = JSON.parse(body)
+        console.log('responseBody', responseBody)
+
+        if (responseBody.status === 200) {
+          const user = responseBody.data
+          console.log('user', user)
+
+          const json2csvParser = new Parser({ fileds: [ 'name', 'phone', 'colleage', 'major', 'email' ]})
+          const csvData = json2csvParser.parse([{
+            name: user.name,
+            phone: user.phone,
+            colleage: user.colleage,
+            major: user.major,
+            email: user.email
+          }])
+          fs.writeFile('./my.csv', csvData, (err) => {
+            if (err) return
+            res.writeHead(200, { 'Content-Type':'text/plain; charset=utf-8' })
+            res.end('저장/성공 완료')
+          })          
+        } else {
+          res.end('fail to homework server')
+        }
+      })
       break
     }
   }
