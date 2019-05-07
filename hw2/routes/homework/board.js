@@ -9,8 +9,14 @@ const { Parser } = require('json2csv')
 const path = require('path')
 const mkdirp = require('mkdirp')
 const csvtojson = require('csvtojson')
+const moment = require('moment')
 
 const dataPath = '../../data/posts.csv'
+const dataField = ['id', 'title', 'content', 'createdAt', 'hashedPassword', 'salt']
+
+function isFileExist(filePath) {
+  return fs.existsSync(path.join(__dirname, filePath))
+}
 
 /**
  * /homework/board/:id
@@ -19,13 +25,25 @@ const dataPath = '../../data/posts.csv'
  */
 router.get('/:id', async (req, res) => {
   const id = req.params.id
-  if (fs.existsSync(path.join(__dirname, dataPath))) {
+  if (!id) {
+    res.status(200).send(
+      authUtil.successFalse(
+        statusCode.NO_CONTENT,
+        responseMessage.OUT_OF_VALUE
+      )
+    )
+    return
+  }
+
+  if (isFileExist(dataPath)) {
     try {
       const posts = await csvtojson().fromFile(path.join(__dirname, dataPath))
 
       for (let post of posts) {
         for (let prop in post) {
           if (prop === 'id' && post[prop] === id) {
+            const formattedDate = moment(parseInt(post['createdAt'], 10)).format('LLLL')
+            post['createdAt'] = formattedDate
             res.status(200).send(
               authUtil.successTrue(
                 statusCode.OK,
@@ -33,6 +51,7 @@ router.get('/:id', async (req, res) => {
                 post
               )
             )
+            return
           }
         }
       }
@@ -44,6 +63,7 @@ router.get('/:id', async (req, res) => {
         )
       )
     } catch (err) {
+      console.log(err)
       if (err.code !== 'ENOENT') {
         res.status(200).send(
           authUtil.successFalse(
@@ -61,8 +81,6 @@ router.get('/:id', async (req, res) => {
       )
     )
   }
-
-  res.send('test!')
 })
 
 /**
@@ -85,9 +103,10 @@ router.post('/', async (req, res) => {
         responseMessage.OUT_OF_VALUE
       )
     )
+    return
   }
 
-  if (fs.existsSync(path.join(__dirname, dataPath))) {
+  if (isFileExist(dataPath)) {
     try {
       const posts = await csvtojson().fromFile(path.join(__dirname, dataPath))
 
@@ -100,6 +119,7 @@ router.post('/', async (req, res) => {
                 responseMessage.ALREADY_POST
               )
             )
+            return
           }
         }
       }
@@ -111,6 +131,7 @@ router.post('/', async (req, res) => {
             responseMessage.FILE_ERR
           )
         )
+        return
       }
     }
   }
@@ -130,13 +151,10 @@ router.post('/', async (req, res) => {
   }
 
   let json2csvParser, csvData
-  if (!fs.existsSync(path.join(__dirname, dataPath))) {
+  if (!isFileExist(dataPath)) {
     mkdirp.sync(path.join(__dirname, '../../data'))
-    json2csvParser = new Parser(
-      { fileds: [ 'id', 'title', 'content', 'createdAt', 'hashedPassword', 'salt' ]}
-    )
+    json2csvParser = new Parser({ fields: dataField })
     csvData = json2csvParser.parse([ post ])
-    
   } else {
     json2csvParser = new Parser({ header: false })
     csvData = json2csvParser.parse([ post ])
@@ -169,8 +187,88 @@ router.put('/', (req, res) => {
  * 게시물을 삭제합니다.
  * 고유 id와 같은 게시물을 삭제합니다.
  */
-router.delete('/', (req, res) => {
+router.delete('/', async (req, res) => {
+  const id = req.body.id
+  const password = req.body.password
+  if (!id || !password) {
+    res.status(200).send(
+      authUtil.successFalse(
+        statusCode.NO_CONTENT,
+        responseMessage.OUT_OF_VALUE
+      )
+    )
+    return
+  }
   
+  if (isFileExist(dataPath)) {
+    try {
+      const posts = await csvtojson().fromFile(path.join(__dirname, dataPath))
+      
+      for (let post of posts) {
+        for (let prop in post) {
+          if (prop === 'id' && post[prop] === id) {
+            const savedPassword = post['hashedPassword']
+            const salt = post['salt']
+
+            const derivedKey = await crypto.pbkdf2Sync(password, salt, 100, 64, 'SHA512')
+            const hashedPassword = derivedKey.toString('base64')
+
+            if (savedPassword === hashedPassword) {
+              if (posts.length === 1) {
+                fs.unlinkSync(path.join(__dirname, dataPath))
+              } else {
+                const idx = posts.indexOf(post)
+                posts.splice(idx, 1)
+
+                const json2csvParser = new Parser({ fileds: dataField })
+                const csvData = json2csvParser.parse(posts)
+                fs.writeFileSync(path.join(__dirname, dataPath), csvData + '\n')
+              }
+            
+              res.status(200).send(
+                authUtil.successTrue(
+                  statusCode.OK,
+                  responseMessage.DELETE_POST,
+                  post
+                )
+              )
+            } else {
+              res.status(200).send(
+                authUtil.successFalse(
+                  statusCode.FORBIDDEN,
+                  responseMessage.MISS_MATCH_PW
+                )
+              )
+            }
+          }
+        }
+      }
+
+      res.status(200).send(
+        authUtil.successFalse(
+          statusCode.NOT_FOUND,
+          responseMessage.FETHCED_POST_FAIL
+        )
+      )
+    } catch (err) {
+      console.log(err)
+      if (err.code !== 'ENOENT') {
+        res.status(200).send(
+          authUtil.successFalse(
+            statusCode.INTERNAL_SERVER_ERROR,
+            responseMessage.FILE_ERR
+          )
+        )
+      }
+    }
+  } else {
+    res.status(200).send(
+      authUtil.successFalse(
+        statusCode.NOT_FOUND,
+        responseMessage.FETHCED_POST_FAIL
+      )
+    )
+  }
 })
 
 module.exports = router

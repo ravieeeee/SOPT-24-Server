@@ -14,5 +14,7 @@ module.exports = {
   ALREADY_POST: "해당 제목의 글이 이미 존재합니다.",
   CREATED_POST: "글 생성 성공",
   FETCHED_POST: "글 조회 성공",
-  FETHCED_POST_FAIL: "해당 글이 없습니다."
+  FETHCED_POST_FAIL: "해당 글이 없습니다.",
+  FILE_ERR: "csv 파일 에러",
+  DELETE_POST: "글 삭제 성공", 
 }
