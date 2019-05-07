@@ -18,11 +18,6 @@ function isFileExist(filePath) {
   return fs.existsSync(path.join(__dirname, filePath))
 }
 
-/**
- * /homework/board/:id
- * GET
- * 게시글의 고유 id가 id인 게시글을 불러옵니다.
- */
 router.get('/:id', async (req, res) => {
   const id = req.params.id
   if (!id) {
@@ -83,13 +78,6 @@ router.get('/:id', async (req, res) => {
   }
 })
 
-/**
- * /homework/board
- * POST
- * 게시물을 저장합니다.
- * id, 제목, 내용, 작성 시간, 비밀번호, salt
- * 같은 제목의 글이 있을 경우, 실패 메시지
- */
 router.post('/', async (req, res) => {
   const id = req.body.id
   const title = req.body.title
@@ -170,23 +158,108 @@ router.post('/', async (req, res) => {
   )
 })
 
-/**
- * /homework/board
- * PUT
- * 게시글을 수정합니다.
- * 고유 id와 같은 게시물을 수정된 값으로 다시 저장(작성 시간도)
- */
-router.put('/', (req, res) => {
+router.put('/', async (req, res) => {
+  const id = req.body.id
+  const title = req.body.title
+  const content = req.body.content
+  const password = req.body.password
+  if (!id || !password) {
+    res.status(200).send(
+      authUtil.successFalse(
+        statusCode.NO_CONTENT,
+        responseMessage.OUT_OF_VALUE
+      )
+    )
+    return
+  }
   
+  if (isFileExist(dataPath)) {
+    try {
+      const posts = await csvtojson().fromFile(path.join(__dirname, dataPath))
 
+      const titles = []
+      if (title) {
+        for (let post of posts) {
+          titles.push(post['title'])
+        }
+      }
+      
+      for (let post of posts) {
+        for (let prop in post) {
+          if (prop === 'id' && post[prop] === id) {
+            const savedPassword = post['hashedPassword']
+            const salt = post['salt']
+
+            const derivedKey = await crypto.pbkdf2Sync(password, salt, 100, 64, 'SHA512')
+            const hashedPassword = derivedKey.toString('base64')
+
+            if (savedPassword === hashedPassword) {
+              titles.splice(posts.indexOf(post), 1)
+              // check title
+              if (title && !!titles.length && titles.includes(title)) {
+                res.status(200).send(
+                  authUtil.successFalse(
+                    statusCode.FORBIDDEN,
+                    responseMessage.ALREADY_POST
+                  )
+                )
+                return
+              }
+
+              if (title) { post['title'] = title }
+              if (content) { post['content'] = content }
+
+              const json2csvParser = new Parser({ fileds: dataField })
+              const csvData = json2csvParser.parse(posts)
+              fs.writeFileSync(path.join(__dirname, dataPath), csvData + '\n')
+              res.status(200).send(
+                authUtil.successTrue(
+                  statusCode.OK,
+                  responseMessage.MODIFY_POST,
+                  post
+                )
+              )
+              return
+            } else {
+              res.status(200).send(
+                authUtil.successFalse(
+                  statusCode.FORBIDDEN,
+                  responseMessage.MISS_MATCH_PW
+                )
+              )
+              return
+            }
+          }
+        }
+      }
+
+      res.status(200).send(
+        authUtil.successFalse(
+          statusCode.NOT_FOUND,
+          responseMessage.FETHCED_POST_FAIL
+        )
+      )
+    } catch (err) {
+      console.log(err)
+      if (err.code !== 'ENOENT') {
+        res.status(200).send(
+          authUtil.successFalse(
+            statusCode.INTERNAL_SERVER_ERROR,
+            responseMessage.FILE_ERR
+          )
+        )
+      }
+    }
+  } else {
+    res.status(200).send(
+      authUtil.successFalse(
+        statusCode.NOT_FOUND,
+        responseMessage.FETHCED_POST_FAIL
+      )
+    )
+  }
 })
 
-/**
- * /homework/board
- * DELETE
- * 게시물을 삭제합니다.
- * 고유 id와 같은 게시물을 삭제합니다.
- */
 router.delete('/', async (req, res) => {
   const id = req.body.id
   const password = req.body.password
@@ -232,6 +305,7 @@ router.delete('/', async (req, res) => {
                   post
                 )
               )
+              return
             } else {
               res.status(200).send(
                 authUtil.successFalse(
@@ -239,6 +313,7 @@ router.delete('/', async (req, res) => {
                   responseMessage.MISS_MATCH_PW
                 )
               )
+              return
             }
           }
         }

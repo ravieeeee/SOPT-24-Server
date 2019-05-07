@@ -16,5 +16,6 @@ module.exports = {
   FETCHED_POST: "글 조회 성공",
   FETHCED_POST_FAIL: "해당 글이 없습니다.",
   FILE_ERR: "csv 파일 에러",
-  DELETE_POST: "글 삭제 성공", 
+  DELETE_POST: "글 삭제 성공",
+  MODIFY_POST: "글 수정 성공",
 }
