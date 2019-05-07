@@ -17,8 +17,51 @@ const dataPath = '../../data/posts.csv'
  * GET
  * 게시글의 고유 id가 id인 게시글을 불러옵니다.
  */
-router.get('/', (req, res) => {
-  
+router.get('/:id', async (req, res) => {
+  const id = req.params.id
+  if (fs.existsSync(path.join(__dirname, dataPath))) {
+    try {
+      const posts = await csvtojson().fromFile(path.join(__dirname, dataPath))
+
+      for (let post of posts) {
+        for (let prop in post) {
+          if (prop === 'id' && post[prop] === id) {
+            res.status(200).send(
+              authUtil.successTrue(
+                statusCode.OK,
+                responseMessage.FETCHED_POST,
+                post
+              )
+            )
+          }
+        }
+      }
+
+      res.status(200).send(
+        authUtil.successFalse(
+          statusCode.NOT_FOUND,
+          responseMessage.FETHCED_POST_FAIL
+        )
+      )
+    } catch (err) {
+      if (err.code !== 'ENOENT') {
+        res.status(200).send(
+          authUtil.successFalse(
+            statusCode.INTERNAL_SERVER_ERROR,
+            responseMessage.FILE_ERR
+          )
+        )
+      }
+    }
+  } else {
+    res.status(200).send(
+      authUtil.successFalse(
+        statusCode.NOT_FOUND,
+        responseMessage.FETHCED_POST_FAIL
+      )
+    )
+  }
+
   res.send('test!')
 })
 
@@ -65,7 +108,7 @@ router.post('/', async (req, res) => {
         res.status(200).send(
           authUtil.successFalse(
             statusCode.INTERNAL_SERVER_ERROR,
-            'file error'
+            responseMessage.FILE_ERR
           )
         )
       }
@@ -100,7 +143,13 @@ router.post('/', async (req, res) => {
   }
   fs.appendFileSync(path.join(__dirname, dataPath), csvData + '\n')
 
-  res.status(statusCode.OK).send(post)
+  res.status(statusCode.OK).send(
+    authUtil.successTrue(
+      statusCode.CREATED,
+      responseMessage.CREATED_POST,
+      post
+    )
+  )
 })
 
 /**
