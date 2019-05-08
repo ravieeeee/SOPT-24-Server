@@ -208,6 +208,7 @@ router.put('/', async (req, res) => {
 
               if (title) { post['title'] = title }
               if (content) { post['content'] = content }
+              post['createdAt'] = new Date().getTime()
 
               const json2csvParser = new Parser({ fileds: dataField })
               const csvData = json2csvParser.parse(posts)
