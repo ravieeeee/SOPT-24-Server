@@ -39,6 +39,8 @@ router.get('/:id', async (req, res) => {
           if (prop === 'id' && post[prop] === id) {
             const formattedDate = moment(parseInt(post['createdAt'], 10)).format('LLLL')
             post['createdAt'] = formattedDate
+            delete post.salt
+            delete post.hashedPassword
             res.status(200).send(
               authUtil.successTrue(
                 statusCode.OK,
@@ -149,6 +151,8 @@ router.post('/', async (req, res) => {
   }
   fs.appendFileSync(path.join(__dirname, dataPath), csvData + '\n')
 
+  delete post.salt
+  delete post.hashedPassword
   res.status(statusCode.OK).send(
     authUtil.successTrue(
       statusCode.CREATED,
@@ -213,6 +217,8 @@ router.put('/', async (req, res) => {
               const json2csvParser = new Parser({ fileds: dataField })
               const csvData = json2csvParser.parse(posts)
               fs.writeFileSync(path.join(__dirname, dataPath), csvData + '\n')
+              delete post.salt
+              delete post.hashedPassword
               res.status(200).send(
                 authUtil.successTrue(
                   statusCode.OK,
@@ -298,7 +304,9 @@ router.delete('/', async (req, res) => {
                 const csvData = json2csvParser.parse(posts)
                 fs.writeFileSync(path.join(__dirname, dataPath), csvData + '\n')
               }
-            
+              
+              delete post.salt
+              delete post.hashedPassword
               res.status(200).send(
                 authUtil.successTrue(
                   statusCode.OK,
